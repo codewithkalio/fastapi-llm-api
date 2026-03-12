@@ -51,6 +51,15 @@ class SentimentResponse(BaseModel):
     explanation: str = Field(..., description="Short explanation of why this label was chosen")
 
 
+def _decode_json_body(raw: bytes) -> str:
+    """Decode and normalize request body for JSON parsing: UTF-8, smart quotes, invalid control chars."""
+    body_str = raw.decode("utf-8", errors="replace")
+    body_str = body_str.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
+    # JSON allows only \t, \n, \r in 0x00-0x1F; replace other control chars with space
+    body_str = "".join(c if c in "\t\n\r" or ord(c) >= 32 else " " for c in body_str)
+    return body_str
+
+
 @app.get("/")
 def root():
     return {"message": "Hello, World!"}
@@ -64,8 +73,43 @@ def health():
     }
 
 
-@app.post("/summarize")
-def summarize(body: SummarizeRequest):
+_SUMMARIZE_REQUEST_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": SummarizeRequest.model_json_schema(),
+                "example": {"text": "Your long article or document text goes here.", "max_length": 150},
+            }
+        },
+    }
+}
+
+
+@app.post("/summarize", openapi_extra=_SUMMARIZE_REQUEST_BODY)
+async def summarize(request: Request):
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if content_type != "application/json":
+        raise HTTPException(
+            status_code=415,
+            detail="Content-Type must be application/json.",
+        )
+    raw = await request.body()
+    body_str = _decode_json_body(raw)
+    try:
+        body_data = json.loads(body_str)
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid JSON body: {e.msg}. Send {{\"text\": \"...\", \"max_length\": 150}} with Content-Type: application/json.",
+        ) from e
+    if not isinstance(body_data, dict):
+        raise HTTPException(status_code=422, detail="JSON body must be an object.")
+    try:
+        body = SummarizeRequest.model_validate(body_data)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key or not api_key.strip():
         raise HTTPException(
@@ -121,12 +165,7 @@ async def analyze_sentiment(request: Request) -> SentimentResponse:
     content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
     if content_type == "application/json":
         raw = await request.body()
-        try:
-            body_str = raw.decode("utf-8", errors="replace")
-        except Exception as e:
-            raise HTTPException(status_code=422, detail="Request body is not valid UTF-8.") from e
-        # Normalize common Unicode/smart quotes to ASCII so copy-pasted JSON parses (e.g. from docs or U+201C/U+201D)
-        body_str = body_str.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
+        body_str = _decode_json_body(raw)
         try:
             body_data = json.loads(body_str)
         except json.JSONDecodeError as e:
