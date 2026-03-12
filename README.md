@@ -115,7 +115,3 @@ This app is deployed on [Render](https://render.com) (free tier).
 - [Python Dotenv](https://pypi.org/project/python-dotenv/)
 
 ---
-
-## Notes
-
-This project was built as a hands-on exercise in prompt engineering. Each LLM endpoint was tested with multiple prompt variations to evaluate output quality. See the [project write-up](#) for full documentation of prompt experiments and results.
