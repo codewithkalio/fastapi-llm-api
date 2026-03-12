@@ -2,12 +2,6 @@
 
 A lightweight FastAPI application that exposes LLM-powered text analysis via a REST API. Built and deployed as part of a prompt engineering exercise.
 
-## Live API
-
-**Base URL:** `https://your-app.onrender.com`  
-Interactive docs: `https://your-app.onrender.com/docs`
-
-Replace with your Render service URL if deployed.
 
 ## Endpoints
 
@@ -115,7 +109,7 @@ The API will be running at `http://localhost:8000`. Visit `http://localhost:8000
 
 ## Deployment
 
-This app is deployed on [Render](https://render.com) (free tier).
+This app is deployed on Render.
 
 - The `main` branch is connected to Render and deploys automatically on push.
 - Set `OPENAI_API_KEY` in the Render dashboard (never commit it to this repo). You can also set `OPENAI_SUMMARIZE_MODEL` and `OPENAI_SENTIMENT_MODEL` there to override the default model.
