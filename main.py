@@ -55,9 +55,14 @@ def _decode_json_body(raw: bytes) -> str:
     """Decode and normalize request body for JSON parsing: UTF-8, smart quotes, invalid control chars."""
     body_str = raw.decode("utf-8", errors="replace")
     body_str = body_str.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
-    # JSON allows only \t, \n, \r in 0x00-0x1F; replace other control chars with space
+    # JSON allows only \t, \n, \r in 0x00-0x1F; replace other control chars with space (handles literal control chars)
     body_str = "".join(c if c in "\t\n\r" or ord(c) >= 32 else " " for c in body_str)
     return body_str
+
+
+def _sanitize_text(s: str) -> str:
+    """Replace control characters in text with space so it's safe for APIs (e.g. after strict=False parse)."""
+    return "".join(c if c in "\t\n\r" or ord(c) >= 32 else " " for c in s)
 
 
 @app.get("/")
@@ -97,7 +102,7 @@ async def summarize(request: Request):
     raw = await request.body()
     body_str = _decode_json_body(raw)
     try:
-        body_data = json.loads(body_str)
+        body_data = json.loads(body_str, strict=False)
     except json.JSONDecodeError as e:
         raise HTTPException(
             status_code=422,
@@ -118,10 +123,11 @@ async def summarize(request: Request):
         )
     model = os.getenv("OPENAI_SUMMARIZE_MODEL", "gpt-4o-mini")
     client = OpenAI(api_key=api_key)
+    text = _sanitize_text(body.text)
     prompt = (
         f"Summarize the following text in at most {body.max_length} words. "
         "Return only the summary, no preamble.\n\n"
-        f"{body.text}"
+        f"{text}"
     )
     try:
         response = client.chat.completions.create(
@@ -167,7 +173,7 @@ async def analyze_sentiment(request: Request) -> SentimentResponse:
         raw = await request.body()
         body_str = _decode_json_body(raw)
         try:
-            body_data = json.loads(body_str)
+            body_data = json.loads(body_str, strict=False)
         except json.JSONDecodeError as e:
             raise HTTPException(
                 status_code=422,
@@ -224,7 +230,7 @@ async def analyze_sentiment(request: Request) -> SentimentResponse:
                 {"role": "system", "content": system_message},
                 {
                     "role": "user",
-                    "content": f"Analyze the sentiment of the following text:\n\n{body.text}",
+                    "content": f"Analyze the sentiment of the following text:\n\n{_sanitize_text(body.text)}",
                 },
             ],
             max_tokens=300,
