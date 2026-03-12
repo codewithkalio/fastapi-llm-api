@@ -29,7 +29,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/Users/kaliml/Cursor Projects/week1-fast-api/venv"
+set -gx VIRTUAL_ENV "/Users/kaliml/Cursor Projects/fastapi-llm-api/venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
