@@ -7,7 +7,21 @@ A lightweight FastAPI application that exposes LLM-powered text analysis via a R
 **Base URL:** `https://your-app.onrender.com`  
 Interactive docs: `https://your-app.onrender.com/docs`
 
+Replace with your Render service URL if deployed.
+
 ## Endpoints
+
+### `GET /`
+Returns a simple greeting.
+
+**Response:**
+```json
+{
+  "message": "Hello, World!"
+}
+```
+
+---
 
 ### `GET /health`
 Returns the current status and timestamp of the API.
@@ -25,11 +39,12 @@ Returns the current status and timestamp of the API.
 ### `POST /summarize`
 Summarizes a block of text to a specified maximum length.
 
-**Request body:**
+**Request body:** `max_length` is in words (1–2000), default 150.
+
 ```json
 {
   "text": "Your long text here...",
-  "max_length": 100
+  "max_length": 150
 }
 ```
 
@@ -43,7 +58,7 @@ Summarizes a block of text to a specified maximum length.
 ---
 
 ### `POST /analyze-sentiment`
-Analyzes the sentiment of a given text and returns a label, confidence score, and explanation.
+Analyzes the sentiment of a given text and returns a label, confidence score, and explanation. Accepts JSON or `application/x-www-form-urlencoded` with a `text` field.
 
 **Request body:**
 ```json
@@ -73,7 +88,7 @@ cd fastapi-llm-api
 
 **2. Create and activate a virtual environment**
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
@@ -84,10 +99,10 @@ pip install -r requirements.txt
 
 **4. Set up environment variables**
 
-Create a `.env` file in the root directory:
-```
-OPENAI_API_KEY=your_key_here
-```
+Copy `.env.example` to `.env` in the root directory and fill in your values.
+
+- **Required:** `OPENAI_API_KEY` (for `/summarize` and `/analyze-sentiment`).
+- **Optional:** `OPENAI_SUMMARIZE_MODEL`, `OPENAI_SENTIMENT_MODEL` (default: `gpt-4o-mini`).
 
 **5. Start the server**
 ```bash
@@ -103,7 +118,7 @@ The API will be running at `http://localhost:8000`. Visit `http://localhost:8000
 This app is deployed on [Render](https://render.com) (free tier).
 
 - The `main` branch is connected to Render and deploys automatically on push.
-- The `OPENAI_API_KEY` environment variable is set in the Render dashboard and is never committed to this repo.
+- Set `OPENAI_API_KEY` in the Render dashboard (never commit it to this repo). You can also set `OPENAI_SUMMARIZE_MODEL` and `OPENAI_SENTIMENT_MODEL` there to override the default model.
 
 ---
 
