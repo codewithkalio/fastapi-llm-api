@@ -16,7 +16,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "")
 # if not DEBUG and not SECRET_KEY:
 #     raise ValueError("SECRET_KEY must be set when DEBUG is false")
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 app = FastAPI(debug=DEBUG)
@@ -98,7 +98,42 @@ def summarize(body: SummarizeRequest):
 
 
 @app.post("/analyze-sentiment", response_model=SentimentResponse)
-def analyze_sentiment(body: SentimentRequest) -> SentimentResponse:
+async def analyze_sentiment(request: Request) -> SentimentResponse:
+    # Accept either JSON or form data so clients can send Content-Type: application/json or form encoding
+    content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
+    if content_type == "application/json":
+        try:
+            body_data = await request.json()
+        except json.JSONDecodeError as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid JSON body: {e.msg}. Send {{'text': 'your text here'}} with Content-Type: application/json.",
+            ) from e
+        if not isinstance(body_data, dict) or "text" not in body_data:
+            raise HTTPException(
+                status_code=422,
+                detail='JSON body must be an object with a "text" field.',
+            )
+        body = SentimentRequest.model_validate(body_data)
+    elif content_type in ("application/x-www-form-urlencoded", "multipart/form-data"):
+        form = await request.form()
+        text = form.get("text")
+        if text is None:
+            raise HTTPException(
+                status_code=422,
+                detail='Form body must include a "text" field.',
+            )
+        if hasattr(text, "read"):
+            text = (await text.read()).decode("utf-8", errors="replace")
+        else:
+            text = str(text)
+        body = SentimentRequest(text=text)
+    else:
+        raise HTTPException(
+            status_code=415,
+            detail="Content-Type must be application/json or application/x-www-form-urlencoded.",
+        )
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key or not api_key.strip():
         raise HTTPException(
