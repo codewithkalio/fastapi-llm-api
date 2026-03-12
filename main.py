@@ -97,17 +97,42 @@ def summarize(body: SummarizeRequest):
         ) from e
 
 
-@app.post("/analyze-sentiment", response_model=SentimentResponse)
+# OpenAPI request body for Swagger UI (handler uses Request, so we document body here)
+_SENTIMENT_REQUEST_BODY = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": SentimentRequest.model_json_schema(),
+                "example": {"text": "I'm really happy with this purchase."},
+            }
+        },
+    }
+}
+
+
+@app.post(
+    "/analyze-sentiment",
+    response_model=SentimentResponse,
+    openapi_extra=_SENTIMENT_REQUEST_BODY,
+)
 async def analyze_sentiment(request: Request) -> SentimentResponse:
     # Accept either JSON or form data so clients can send Content-Type: application/json or form encoding
     content_type = (request.headers.get("content-type") or "").split(";")[0].strip().lower()
     if content_type == "application/json":
+        raw = await request.body()
         try:
-            body_data = await request.json()
+            body_str = raw.decode("utf-8", errors="replace")
+        except Exception as e:
+            raise HTTPException(status_code=422, detail="Request body is not valid UTF-8.") from e
+        # Normalize common Unicode/smart quotes to ASCII so copy-pasted JSON parses (e.g. from docs or U+201C/U+201D)
+        body_str = body_str.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
+        try:
+            body_data = json.loads(body_str)
         except json.JSONDecodeError as e:
             raise HTTPException(
                 status_code=422,
-                detail=f"Invalid JSON body: {e.msg}. Send {{'text': 'your text here'}} with Content-Type: application/json.",
+                detail=f"Invalid JSON body: {e.msg}. Send {{\"text\": \"your text here\"}} with Content-Type: application/json.",
             ) from e
         if not isinstance(body_data, dict) or "text" not in body_data:
             raise HTTPException(
